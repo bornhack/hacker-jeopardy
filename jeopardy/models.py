@@ -1,37 +1,14 @@
-from django.core.exceptions import ValidationError
 from django.db import models
 
 
-class OrderWithRespectToConstraintMixin(models.Model):
-
-    child_limit = None
-
-    class Meta:
-        abstract = True
-
-    def clean(self):
-        super().clean()
-
-        key = self._meta.order_with_respect_to.attname
-
-        kwargs = {
-            key: getattr(self, key)
-        }
-
-        if self.__class__.objects.filter(**kwargs).count() >= self.child_limit:
-            raise ValidationError('Limit of {} reached'.format(self.child_limit))
-
-
-class Answer(OrderWithRespectToConstraintMixin, models.Model):
+class Answer(models.Model):
     class Meta:
         verbose_name = 'Answer'
         verbose_name_plural = 'Answers'
-        order_with_respect_to = 'category'
 
     answer = models.CharField(max_length=255)
-    category = models.ForeignKey('jeopardy.Category')
 
-    child_limit = 5
+    question = models.CharField(max_length=255)
 
     VIDEO = 'video'
     IMAGE = 'image'
@@ -42,7 +19,6 @@ class Answer(OrderWithRespectToConstraintMixin, models.Model):
         (VIDEO, 'Video'),
         (IMAGE, 'Image'),
         (AUDIO, 'Audio'),
-        (CHANCE, 'Chance'),
         (TEXT, 'Text'),
     ]
 
@@ -52,34 +28,69 @@ class Answer(OrderWithRespectToConstraintMixin, models.Model):
         default=TEXT
     )
 
+    attachment = models.FileField(upload_to='', null=True, blank=True)
+
     def __str__(self):
         return self.answer
 
 
-class Category(OrderWithRespectToConstraintMixin, models.Model):
+class AnswerCategoryRelation(models.Model):
+    answer = models.ForeignKey('jeopardy.Answer')
+    category = models.ForeignKey('jeopardy.Category')
+    value = models.PositiveIntegerField()
+
+
+class Category(models.Model):
     class Meta:
         verbose_name = 'Category'
         verbose_name_plural = 'Categories'
-        order_with_respect_to = 'round'
-
-    child_limit = 6
 
     title = models.CharField(max_length=255)
-    round = models.ForeignKey('jeopardy.Round')
+
+    answers = models.ManyToManyField(
+        'jeopardy.Answer',
+        related_name='category',
+        through='jeopardy.AnswerCategoryRelation',
+    )
 
     def __str__(self):
         return self.title
 
 
-class Round(OrderWithRespectToConstraintMixin, models.Model):
+class CategoryRoundRelation(models.Model):
+    category = models.ForeignKey('jeopardy.Category')
+    round = models.ForeignKey('jeopardy.Round')
+    number = models.PositiveIntegerField()
+
+
+class Round(models.Model):
     class Meta:
         verbose_name = 'Round'
         verbose_name_plural = 'Rounds'
-        order_with_respect_to = 'game'
 
-    child_limit = 3
+    name = models.CharField(max_length=255)
+    categories = models.ManyToManyField(
+        'jeopardy.Category',
+        related_name='round'
+    )
 
+    NORMAL = 'normal'
+    CHANCE = 'chance'
+    TYPES = [
+        (NORMAL, 'Normal'),
+        (CHANCE, 'Chance')
+    ]
+
+    round_type = models.CharField(max_length=10, choices=TYPES, default=NORMAL)
+
+    def __str__(self):
+        return self.name
+
+
+class RoundGameRelation(models.Model):
+    round = models.ForeignKey('jeopardy.Round')
     game = models.ForeignKey('jeopardy.Game')
+    number = models.PositiveSmallIntegerField()
 
 
 class Game(models.Model):
@@ -89,18 +100,24 @@ class Game(models.Model):
 
     title = models.CharField(max_length=255)
 
-    player1 = models.ForeignKey('jeopardy.player', related_name='player1')
-    player2 = models.ForeignKey('jeopardy.player', related_name='player2')
-    player3 = models.ForeignKey('jeopardy.player', related_name='player3')
+    rounds = models.ManyToManyField(
+        'jeopardy.Round',
+        related_name='game'
+    )
+
+    contestants = models.ManyToManyField(
+        'jeopardy.Contestant',
+        related_name='game'
+    )
 
     def __str__(self):
         return self.title
 
 
-class Player(models.Model):
+class Contestant(models.Model):
     class Meta:
-        verbose_name = 'Player'
-        verbose_name_plural = 'Players'
+        verbose_name = 'Contestant'
+        verbose_name_plural = 'Contestants'
 
     name = models.CharField(max_length=255)
     points = models.IntegerField()

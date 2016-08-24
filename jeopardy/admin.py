@@ -3,13 +3,25 @@ from django.contrib import admin
 from . import models
 
 
+class AnswerInlineAdmin(admin.TabularInline):
+    model = models.AnswerCategoryRelation
+
+
+class CategoryInlineAdmin(admin.TabularInline):
+    model = models.CategoryRoundRelation
+
+
+class ContestantInline(admin.TabularInline):
+    model = models.Game.contestants.through
+
+
+class RoundInline(admin.TabularInline):
+    model = models.RoundGameRelation
+
+
 @admin.register(models.Answer)
 class AnswerModelAdmin(admin.ModelAdmin):
-    pass
-
-
-class AnswerInlineAdmin(admin.TabularInline):
-    model = models.Answer
+    list_filter = ['category']
 
 
 @admin.register(models.Category)
@@ -19,15 +31,19 @@ class CategoryModelAdmin(admin.ModelAdmin):
 
 @admin.register(models.Round)
 class RoundModelAdmin(admin.ModelAdmin):
-    pass
+    list_display = ['name']
+    fields = ['name', 'round_type']
+    inlines = [CategoryInlineAdmin]
 
 
 @admin.register(models.Game)
 class GameModelAdmin(admin.ModelAdmin):
-    pass
+    fields = ['title']
+    inlines = [ContestantInline, RoundInline]
 
 
-@admin.register(models.Player)
-class PlayerModelAdmin(admin.ModelAdmin):
+@admin.register(models.Contestant)
+class ContestantModelAdmin(admin.ModelAdmin):
     pass
+
 
